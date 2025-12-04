@@ -143,6 +143,26 @@ static void print_stats(const struct counter_status* diff)
     double frequency, idle_pct, vertex_pct, fragment_pct;
     double valid_pct, stall_tmu_pct, stall_sb_pct, stall_vary_pct;
 
+    /* Clear screen and move cursor to top */
+    printf("\033[2J\033[H");
+
+    /* Header */
+    printf("============================================\n");
+    printf("       VC4 GPU Performance Monitor          \n");
+    printf("============================================\n");
+
+    /* Debug: show raw counter values */
+    printf("  Raw counters (per %.2fs):\n", timediff);
+    printf("    [0] Idle:       %lld\n", diff->counts[0]);
+    printf("    [1] Vertex:     %lld\n", diff->counts[1]);
+    printf("    [2] Fragment:   %lld\n", diff->counts[2]);
+    printf("    [3] Valid:      %lld\n", diff->counts[3]);
+    printf("    [4] TMU Stall:  %lld\n", diff->counts[4]);
+    printf("    [5] SB Stall:   %lld\n", diff->counts[5]);
+    printf("    [6] Vary Stall: %lld\n", diff->counts[6]);
+    printf("    idle_count:     %d\n", diff->idle_count);
+    printf("--------------------------------------------\n");
+
     if (total_clock == 0)
         total_clock = 1;
 
@@ -156,16 +176,8 @@ static void print_stats(const struct counter_status* diff)
     stall_sb_pct = diff->counts[5] / total_clock * 1e2;
     stall_vary_pct = diff->counts[6] / total_clock * 1e2;
 
-    /* Clear screen and move cursor to top */
-    printf("\033[2J\033[H");
-
-    /* Header */
-    printf("============================================\n");
-    printf("       VC4 GPU Performance Monitor          \n");
-    printf("============================================\n");
-
     /* Frequency */
-    printf("  Frequency: %.1f MHz\n", frequency);
+    printf("  Frequency: %.1f MHz (total_clock: %.0f)\n", frequency, total_clock);
     printf("--------------------------------------------\n");
 
     /* Performance bars */
