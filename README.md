@@ -180,7 +180,7 @@ GNU General Public License v3.0 - see [LICENSE.txt](LICENSE.txt)
 
 ## References
 
-- [VideoCore IV 3D Architecture Reference Guide](https://docs.broadcom.com/doc/12358545)
+- [VideoCore IV 3D Architecture Reference Guide](VideoCoreIV-AG100-R.pdf) (Local copy, original from [Broadcom](https://docs.broadcom.com/doc/12358545))
 - Raspberry Pi firmware source code
 
 ## Fork Information
