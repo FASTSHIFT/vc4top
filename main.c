@@ -136,12 +136,25 @@ static void print_bar(const char* label, double percent, int width)
 static void print_stats(const struct counter_status* diff)
 {
     double timediff = diff->timediff;
-    double total_clock = diff->counts[0] + diff->counts[1] + diff->counts[2]
-        + diff->counts[3] + diff->counts[4] + diff->counts[5]
-        + diff->counts[6];
 
-    double frequency, idle_pct, vertex_pct, fragment_pct;
+    /* counts[0] = Idle cycles, counts[1-6] = active cycles of different types */
+    long long idle_cycles = diff->counts[0];
+    long long vertex_cycles = diff->counts[1];
+    long long fragment_cycles = diff->counts[2];
+    long long valid_cycles = diff->counts[3];
+    long long tmu_stall = diff->counts[4];
+    long long sb_stall = diff->counts[5];
+    long long vary_stall = diff->counts[6];
+
+    /* Total cycles = idle + all active types */
+    double total_cycles = (double)(idle_cycles + vertex_cycles + fragment_cycles + valid_cycles + tmu_stall + sb_stall + vary_stall);
+
+    /* Calculate how much time GPU was powered off (returning 0xDEADBEEF) */
+    double poweroff_ratio = (double)diff->idle_count * sampling_interval_ms / update_interval_ms;
+
+    double idle_pct, vertex_pct, fragment_pct;
     double valid_pct, stall_tmu_pct, stall_sb_pct, stall_vary_pct;
+    double frequency;
 
     /* Clear screen and move cursor to top */
     printf("\033[2J\033[H");
@@ -151,33 +164,58 @@ static void print_stats(const struct counter_status* diff)
     printf("       VC4 GPU Performance Monitor          \n");
     printf("============================================\n");
 
-    /* Debug: show raw counter values */
-    printf("  Raw counters (per %.2fs):\n", timediff);
-    printf("    [0] Idle:       %lld\n", diff->counts[0]);
-    printf("    [1] Vertex:     %lld\n", diff->counts[1]);
-    printf("    [2] Fragment:   %lld\n", diff->counts[2]);
-    printf("    [3] Valid:      %lld\n", diff->counts[3]);
-    printf("    [4] TMU Stall:  %lld\n", diff->counts[4]);
-    printf("    [5] SB Stall:   %lld\n", diff->counts[5]);
-    printf("    [6] Vary Stall: %lld\n", diff->counts[6]);
-    printf("    idle_count:     %d\n", diff->idle_count);
-    printf("--------------------------------------------\n");
+    if (total_cycles < 1) {
+        /* GPU was completely powered off */
+        printf("  GPU Status: POWERED OFF (idle)\n");
+        printf("  Power-off samples: %d / %d\n", diff->idle_count,
+            (int)(update_interval_ms / sampling_interval_ms));
+        printf("============================================\n");
+        printf("Press Ctrl+C to exit\n");
+        fflush(stdout);
+        return;
+    }
 
-    if (total_clock == 0)
-        total_clock = 1;
+    /* Estimate frequency from valid instruction cycles
+     * VC4 QPU runs at ~250-400MHz typically
+     * valid_cycles represents cycles where QPUs executed instructions
+     * This is an approximation based on QPU utilization */
+    frequency = valid_cycles / timediff / 1e6; /* Convert to MHz */
 
-    frequency = total_clock / 12e6 / timediff;
-    idle_pct = diff->idle_count * 1e2 * sampling_interval_ms / update_interval_ms
-        + diff->counts[0] / total_clock * 1e2;
-    vertex_pct = diff->counts[1] / total_clock * 1e2;
-    fragment_pct = diff->counts[2] / total_clock * 1e2;
-    valid_pct = diff->counts[3] / total_clock * 1e2;
-    stall_tmu_pct = diff->counts[4] / total_clock * 1e2;
-    stall_sb_pct = diff->counts[5] / total_clock * 1e2;
-    stall_vary_pct = diff->counts[6] / total_clock * 1e2;
+    /* If we have very few cycles, GPU might be mostly idle */
+    if (frequency < 0.1) {
+        frequency = 0;
+    }
 
-    /* Frequency */
-    printf("  Frequency: %.1f MHz (total_clock: %.0f)\n", frequency, total_clock);
+    /* Calculate percentages based on total cycles */
+    idle_pct = idle_cycles / total_cycles * 100.0;
+    vertex_pct = vertex_cycles / total_cycles * 100.0;
+    fragment_pct = fragment_cycles / total_cycles * 100.0;
+    valid_pct = valid_cycles / total_cycles * 100.0;
+    stall_tmu_pct = tmu_stall / total_cycles * 100.0;
+    stall_sb_pct = sb_stall / total_cycles * 100.0;
+    stall_vary_pct = vary_stall / total_cycles * 100.0;
+
+    /* Adjust for power-off time */
+    if (poweroff_ratio > 0) {
+        double active_ratio = 1.0 - poweroff_ratio;
+        idle_pct = idle_pct * active_ratio + poweroff_ratio * 100.0;
+        vertex_pct *= active_ratio;
+        fragment_pct *= active_ratio;
+        valid_pct *= active_ratio;
+        stall_tmu_pct *= active_ratio;
+        stall_sb_pct *= active_ratio;
+        stall_vary_pct *= active_ratio;
+    }
+
+    /* Status */
+    if (poweroff_ratio > 0.5) {
+        printf("  GPU Status: MOSTLY IDLE (%.0f%% power-gated)\n", poweroff_ratio * 100);
+    } else if (poweroff_ratio > 0) {
+        printf("  GPU Status: ACTIVE (%.0f%% power-gated)\n", poweroff_ratio * 100);
+    } else {
+        printf("  GPU Status: ACTIVE\n");
+    }
+    printf("  QPU Activity: %.2f M cycles/s\n", valid_cycles / timediff / 1e6);
     printf("--------------------------------------------\n");
 
     /* Performance bars */
