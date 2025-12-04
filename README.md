@@ -49,6 +49,51 @@ When the GPU is power-gated (no active work), reading the counters returns `0xDE
 - **Root privileges** (required for `/dev/mem` access)
 - No other dependencies!
 
+## Compatibility
+
+### Supported Raspberry Pi Models ✅
+
+This tool **only works with VideoCore IV (VC4) GPU**:
+
+| Model | SoC | GPU | Supported |
+|-------|-----|-----|-----------|
+| Raspberry Pi 1 (A, B, A+, B+) | BCM2835 | VideoCore IV | ✅ Yes |
+| Raspberry Pi 2 Model B | BCM2836/7 | VideoCore IV | ✅ Yes |
+| Raspberry Pi 3 (B, B+, A+) | BCM2837 | VideoCore IV | ✅ Yes |
+| Raspberry Pi Zero / Zero W / Zero WH | BCM2835 | VideoCore IV | ✅ Yes |
+| Raspberry Pi Zero 2 W | BCM2710 | VideoCore IV | ✅ Yes |
+| Compute Module 1, 3, 3+ | BCM2835/7 | VideoCore IV | ✅ Yes |
+
+### NOT Supported ❌
+
+| Model | SoC | GPU | Supported |
+|-------|-----|-----|-----------|
+| Raspberry Pi 4 Model B | BCM2711 | VideoCore VI | ❌ No |
+| Raspberry Pi 400 | BCM2711 | VideoCore VI | ❌ No |
+| Raspberry Pi 5 | BCM2712 | VideoCore VII | ❌ No |
+| Compute Module 4 | BCM2711 | VideoCore VI | ❌ No |
+
+### Why Not Pi 4/5?
+
+1. **Different register base address**: The code uses `0x3fc00000` which is specific to Pi 1/2/3/Zero. Pi 4+ uses a different memory map.
+
+2. **Different GPU architecture**: VideoCore VI/VII have different performance counter register layouts.
+
+3. **Different kernel driver**: Pi 4+ uses the `v3d` kernel driver instead of the legacy VC4 driver.
+
+### How to Check Your GPU
+
+```bash
+# Check which driver is loaded
+lsmod | grep -E "vc4|v3d"
+
+# vc4 = VideoCore IV (supported)
+# v3d = VideoCore VI/VII (NOT supported)
+
+# Check GPU memory
+vcgencmd get_mem gpu
+```
+
 ## Building
 
 ```bash
